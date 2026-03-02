@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styles from './index.less';
 import loginBg from '@/assets/images/login-bg.jpg';
 import qrCode from '@/assets/images/qr-code.png';
@@ -20,6 +21,7 @@ interface FormErrors {
 }
 
 export default function LoginPage() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<LoginTab>('password');
   const [rememberMe, setRememberMe] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -95,12 +97,14 @@ export default function LoginPage() {
 
   // 返回按钮
   const handleBack = () => {
-    if (activeTab === 'forgot') {
+    if (activeTab === 'email' || activeTab === 'sms') {
+      // 验证页面返回密码登录页
       setActiveTab('password');
-    } else if (activeTab === 'getCode') {
+    } else if (activeTab === 'forgot' || activeTab === 'getCode') {
       setActiveTab('password');
     } else {
-      window.history.back();
+      // 密码登录页或扫码登录页，返回首页
+      navigate('/');
     }
   };
 
