@@ -41,9 +41,22 @@ Claude Code 是 Anthropic 官方推出的 AI 编程助手 CLI 工具，它能够
 
 ## 2. 安装指南
 
-### ⚠️ 重要前提：Node.js 版本
+### ⚠️ 重要前提
 
-> **Node.js 版本必须 >= 22**
+| 依赖 | 版本要求 | 说明 |
+|------|----------|------|
+| **Node.js** | >= 22 | 运行环境 |
+| **Git** | 任意版本 | Claude Code 依赖 Git 进行版本控制 |
+
+#### Windows 用户安装 Git
+
+1. 访问 https://git-scm.com/download/win
+2. 下载并安装 Git for Windows
+3. 安装时建议勾选 "Git Bash Here" 选项
+4. 验证安装：
+   ```bash
+   git --version
+   ```
 
 ### 安装步骤
 
@@ -59,14 +72,6 @@ npm install -g @anthropic-ai/claude-code
 claude --version
 ```
 
-### 截图占位
-
-![Node 版本检查](./images/01-installation/node-version.png)
-*检查 Node.js 版本*
-
-![安装成功](./images/01-installation/install-success.png)
-*Claude Code 安装成功*
-
 ---
 
 ## 3. 配置国产 GLM-5 模型
@@ -79,15 +84,19 @@ claude --version
 
 ### 3.2 配置命令
 
-```bash
-# 方式一：通过环境变量配置
-export ANTHROPIC_API_KEY=your_zhipu_api_key
-export ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
+```json
+#使用工具快捷配置
+#https://docs.bigmodel.cn/cn/coding-plan/tool/claude
 
-# 方式二：在项目中配置
-# 创建或编辑 .env 文件
-echo "ANTHROPIC_API_KEY=your_api_key" >> .env
-echo "ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/paas/v4/" >> .env
+#调整模型
+#目录 ~/.claude/settings.json
+{
+  "env": {
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.5-air",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5"
+  }
+}
 ```
 
 ### 3.3 其他国产模型配置文档
@@ -96,22 +105,13 @@ echo "ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/paas/v4/" >> .env
 |------|------|----------|
 | 通义千问 (Qwen) | 阿里云 | https://help.aliyun.com/zh/model-studio/ |
 | DeepSeek | 深度求索 | https://platform.deepseek.com/docs |
-| Moonshot | 月之暗面 | https://platform.moonshot.cn/docs |
-| GLM-4 | 智谱 AI | https://open.bigmodel.cn/dev/api |
-
-### 截图占位
-
-![智谱 AI 控制台](./images/02-config/zhipu-console.png)
-*智谱 AI 开放平台控制台*
-
-![API Key 创建](./images/02-config/api-key-create.png)
-*创建 API Key*
+| GLM-5 | 智谱 AI | https://docs.bigmodel.cn/cn/coding-plan/overview |
 
 ---
 
 ## 4. Claude Code 常用模式与指令
 
-### 4.1 四种编辑模式
+### 4.1 五种编辑模式
 
 | 模式 | 命令 | 适用场景 |
 |------|------|----------|
@@ -119,6 +119,51 @@ echo "ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/paas/v4/" >> .env
 | **自动确认** | `claude --yes` | 快速执行，自动确认所有操作 |
 | **打印模式** | `claude --print` | 输出到文件，支持管道操作 |
 | **跳过权限** | `claude --dangerously-skip-permissions` | CI/CD 场景，完全自动化 |
+| **计划模式** | `claude --plan` | 先制定计划再执行，适合复杂任务 |
+
+#### 关于打印模式
+
+打印模式让 Claude Code 以纯文本形式输出结果，不进入交互界面，适合自动化场景。
+
+**核心特点**：
+- 非交互式，直接输出到终端
+- 支持管道操作，可与 shell 命令组合
+- 输出可重定向到文件
+
+**使用示例**：
+
+```bash
+# 基础用法 - 直接提问
+claude --print "今天是几月几号"
+
+# 输出保存到文件
+claude --print "今天是星期几 用英文" > README.md
+# （追加写入）
+claude --print "今天是星期几 用英文" > README.md
+
+# 从文件读取输入
+claude --print "优化这段代码" < src/utils.ts
+
+# 代码审查并保存报告
+claude --print "审查 src/ 目录的代码质量" > review-report.md
+
+# 配合 grep 过滤输出
+claude --print "列出项目的所有依赖" | grep "react"
+
+# 生成测试用例
+claude --print "为 src/api.ts 生成单元测试" > tests/api.test.ts
+
+# 组合参数使用
+claude --print --yes "重构 src/legacy.js 使用 ES6 语法" > refactored.js
+
+# 批量处理（shell 脚本）
+for file in src/*.ts; do
+  claude --print "为这个文件添加类型注释" < "$file" > "typed/$(basename $file)"
+done
+
+# CI/CD 场景 - 自动化代码检查
+claude --print --dangerously-skip-permissions "检查代码中的安全漏洞"
+```
 
 ### 4.2 常用指令
 
@@ -132,6 +177,8 @@ echo "ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/paas/v4/" >> .env
 /review          # 代码审查
 /terminal-setup  # 配置终端集成
 /fast            # 切换快速模式
+/agents          # 查看可用的 Agent
+/resume          # 恢复上一次的对话
 ```
 
 ### 4.3 CLAUDE.md 文件
@@ -167,14 +214,6 @@ echo "ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/paas/v4/" >> .env
 - 文件放在项目根目录
 - 保持简洁，避免过长（建议 < 200 行）
 - 定期更新维护
-
-### 截图占位
-
-![/init 执行效果](./images/02-config/init-command.png)
-*执行 /init 命令*
-
-![CLAUDE.md 示例](./images/02-config/claude-md-example.png)
-*CLAUDE.md 文件示例*
 
 ---
 
@@ -248,11 +287,6 @@ Claude Code
 - 向量搜索
 - 图像理解
 
-### 截图占位
-
-![MCP 配置文件](./images/03-mcp/zhipu-mcp-config.png)
-*GLM MCP 配置*
-
 ---
 
 ## 7. 安装 Figma MCP
@@ -297,11 +331,6 @@ claude mcp add figma
 | `generate_diagram` | 在 FigJam 生成流程图 |
 | `generate_figma_design` | 网页转 Figma 设计 |
 
-### 截图占位
-
-![Figma Token 生成](./images/03-mcp/figma-token.png)
-*生成 Figma Personal Access Token*
-
 ---
 
 ## 8. 安装 ChromeDevTools MCP
@@ -332,11 +361,6 @@ claude mcp add @anthropic-ai/chrome-devtools-mcp
 2. 访问 `chrome://extensions/`
 3. 启用「开发者模式」
 4. 安装相关扩展
-
-### 截图占位
-
-![MCP 安装命令](./images/03-mcp/chrome-mcp-install.png)
-*安装 Chrome DevTools MCP*
 
 ---
 
@@ -380,14 +404,6 @@ evaluate_script          # 执行 JavaScript
 performance_start_trace  # 开始性能追踪
 performance_stop_trace   # 停止追踪并分析
 ```
-
-### 截图占位
-
-![页面快照示例](./images/04-demo/snapshot-example.png)
-*页面快照示例*
-
-![网络请求监控](./images/04-demo/network-monitor.png)
-*网络请求监控*
 
 ---
 
@@ -446,17 +462,6 @@ performance_stop_trace   # 停止追踪并分析
    - 检查页面结构
    - 验证交互效果
    - 对比设计稿
-
-### 截图占位
-
-![Figma 设计稿](./images/04-demo/figma-design.png)
-*原始 Figma 设计*
-
-![生成的代码](./images/04-demo/generated-code.png)
-*Claude 生成的代码*
-
-![最终效果](./images/04-demo/final-result.png)
-*实现后的页面效果*
 
 ---
 
@@ -532,11 +537,6 @@ performance_stop_trace   # 停止追踪并分析
 - 无 WebRTC/DNS 泄露
 - 时区与 IP 地区一致
 
-### 截图占位
-
-![IP 质量检测](./images/05-appendix/ip-check.png)
-*IP 质量检测示例*
-
 ### 12.3 获取纯净 IP
 
 #### 推荐方案
@@ -596,11 +596,6 @@ performance_stop_trace   # 停止追踪并分析
 - 建议使用同一张卡续费
 - 保留充值记录以便申诉
 - 避免频繁更换支付方式
-
-### 截图占位
-
-![虚拟卡注册](./images/05-appendix/virtual-card.png)
-*虚拟卡注册流程*
 
 ---
 
