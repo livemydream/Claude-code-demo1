@@ -262,6 +262,8 @@ Claude Code
 
 ## 6. 配置 GLM 相关的 MCP
 
+> **配置文档**：https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server
+
 ### 6.1 安装配置
 
 编辑 `.claude/settings.json`：
@@ -280,12 +282,52 @@ Claude Code
 }
 ```
 
-### 6.2 可用功能
+### 6.2 GLM 提供的 MCP 服务
 
-- 智谱 AI 模型调用
-- 知识库检索
-- 向量搜索
-- 图像理解
+| 名称 | 类型 | 擅长 | 说明 |
+|------|------|------|------|
+| **web-search-prime** | 搜索工具 | 查网页 | 联网搜索，获取最新信息 |
+| **web-reader** | 网页抓取工具 | 读网页 | 抓取网页内容，转换为 Markdown |
+| **zai-mcp-server** | MCP 服务集合 | 提供联网能力 | 图像分析、视频分析、UI 转代码等 |
+| **zread** | 代码仓库工具 | 读 GitHub 项目 | 读取 GitHub 仓库结构、文件内容、搜索文档 |
+
+#### 各服务详细介绍
+
+**web-search-prime** - 网络搜索
+```
+# 使用场景
+- 搜索最新技术文档
+- 查找解决方案
+- 获取实时信息
+```
+
+**web-reader** - 网页阅读
+```
+# 使用场景
+- 读取网页内容
+- 提取网页信息
+- 转换为 Markdown 格式
+```
+
+**zai-mcp-server** - 多功能服务集
+```
+# 主要功能
+- analyze_image: 图像分析
+- analyze_video: 视频分析
+- ui_to_artifact: UI 截图转代码
+- extract_text_from_screenshot: 截图文字提取
+- diagnose_error_screenshot: 错误截图诊断
+- analyze_data_visualization: 数据可视化分析
+- understand_technical_diagram: 技术图表理解
+```
+
+**zread** - GitHub 仓库阅读
+```
+# 主要功能
+- get_repo_structure: 获取仓库目录结构
+- read_file: 读取指定文件内容
+- search_doc: 搜索文档、Issues、Commits
+```
 
 ---
 
