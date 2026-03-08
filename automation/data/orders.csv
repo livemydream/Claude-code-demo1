@@ -1,0 +1,4 @@
+id,nps,schedule,quantity,unit,remark,priority
+ORD-001,1/2,STD,1000,FT,测试订单 - NPS 1/2 STD,normal
+ORD-002,3/4,S40,500,FT,测试订单 - NPS 3/4 S40,normal
+ORD-003,1,XS,200,FT,测试订单 - NPS 1 XS,high

@@ -1,0 +1,45 @@
+{
+  "batchName": "2024-03-测试批次-001",
+  "createdAt": "2024-03-08T10:00:00Z",
+  "config": {
+    "delayBetweenOrders": 2000,
+    "maxRetries": 3,
+    "screenshotOnError": true,
+    "confirmBeforeSubmit": false
+  },
+  "orders": [
+    {
+      "id": "ORD-001",
+      "spec": {
+        "nps": "1/2",
+        "schedule": "STD"
+      },
+      "quantity": 1000,
+      "unit": "FT",
+      "remark": "测试订单 - NPS 1/2 STD",
+      "priority": "normal"
+    },
+    {
+      "id": "ORD-002",
+      "spec": {
+        "nps": "3/4",
+        "schedule": "STD"
+      },
+      "quantity": 500,
+      "unit": "FT",
+      "remark": "测试订单 - NPS 3/4 STD",
+      "priority": "normal"
+    },
+    {
+      "id": "ORD-003",
+      "spec": {
+        "nps": "1",
+        "schedule": "XS"
+      },
+      "quantity": 200,
+      "unit": "FT",
+      "remark": "测试订单 - NPS 1 XS",
+      "priority": "high"
+    }
+  ]
+}
