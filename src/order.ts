@@ -2,6 +2,8 @@ import { chromium, Browser, Page } from 'playwright';
 import * as XLSX from 'xlsx';
 import * as path from 'path';
 import * as readline from 'readline';
+import https from 'https';
+import querystring from 'querystring';
 
 // ==================== 配置 ====================
 const CONFIG = {
@@ -860,7 +862,7 @@ async function fillSubmitPage(page: Page, order: OrderRow) {
 
       // 点击展开下拉框
       await yardSelect.click();
-      await sleep(300);
+      await sleep(500);
 
       // 找到输入框并输入地址（这会触发远程搜索）
       const yardInput = yardSelect.locator('input').first();
@@ -869,26 +871,39 @@ async function fillSubmitPage(page: Page, order: OrderRow) {
       await yardInput.fill(order.yardAddress);
       console.log(`  ✓ 已输入 Yard Address: ${order.yardAddress}`);
 
-      // 触发搜索 - 模拟用户输入完成（失焦会触发远程搜索）
+      // 触发搜索 - 模拟用户输入完成
       await yardInput.press('End');  // 移动光标到末尾
-      await sleep(2000);  // 等待远程搜索完成
+      await sleep(500);
 
-      // 等待下拉框出现并有选项
+      // 等待远程搜索完成 - 轮询检查选项是否出现
+      console.log('  ⏳ 等待搜索结果...');
       const dropdown = page.locator('.el-select-dropdown.is-visible, .el-popper[aria-hidden="false"]').last();
-      await dropdown.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-
-      // 在当前下拉框中找选项
       const options = dropdown.locator('.el-select-dropdown__item');
-      const optionCount = await options.count();
-      console.log(`  当前下拉菜单中找到 ${optionCount} 个 Yard Address 选项`);
 
-      if (optionCount > 0) {
+      let optionCount = 0;
+      let retries = 0;
+      const maxRetries = 15;  // 最多等待 7.5 秒
+
+      while (retries < maxRetries) {
+        optionCount = await options.count();
+        if (optionCount > 0) {
+          console.log(`  ✓ 搜索完成，找到 ${optionCount} 个选项`);
+          break;
+        }
+        await sleep(500);
+        retries++;
+        if (retries % 4 === 0) {
+          console.log(`  等待搜索结果... (${retries * 500}ms)`);
+        }
+      }
+
+      if (optionCount === 0) {
+        console.warn('  ⚠ 没有找到 Yard Address 搜索结果');
+      } else {
         // 选择第一个选项
         await options.first().click({ force: true });
         console.log('  ✓ 已选择第一个 Yard Address 结果');
         await sleep(500);
-      } else {
-        console.warn('  ⚠ 没有找到 Yard Address 搜索结果');
       }
     } catch (e) {
       console.warn(`  ⚠ 填写 Yard Address 失败: ${e}`);
@@ -944,6 +959,63 @@ async function fillSubmitPage(page: Page, order: OrderRow) {
     await submitBtn.waitFor({ timeout: 5000 });
     await submitBtn.click();
     console.log('  ✅ 已点击 Submit 按钮');
+
+    // 等待弹窗出现
+    await sleep(2000);
+    console.log('\n  📋 处理 Quote ID 弹窗...');
+
+    // 调用 API 创建 Channel Quote 获取 quoteID
+    console.log('  📍 调用 API 创建 Channel Quote...');
+    const quoteID = await createChannelQuote(order.company || '');
+
+    if (quoteID) {
+      // 查找弹窗中的输入框并填入 quoteID
+      const quoteInput = page.locator('input[placeholder*="Q"], input[placeholder*="quote"], input[placeholder*="ID"]').first();
+      // 备用：查找所有可见的 input
+      const allInputs = page.locator('input:visible');
+
+      if (await quoteInput.count() > 0) {
+        await quoteInput.fill(quoteID);
+        console.log(`  ✓ 已填入 Quote ID: ${quoteID}`);
+      } else {
+        // 尝试查找 layui 弹窗中的输入框
+        const layuiInput = page.locator('.layui-layer input').first();
+        if (await layuiInput.count() > 0) {
+          await layuiInput.fill(quoteID);
+          console.log(`  ✓ 已填入 Quote ID (layui): ${quoteID}`);
+        } else {
+          // 尝试查找 Element Plus 弹窗中的输入框
+          const elDialogInput = page.locator('.el-dialog input, .el-message-box input').first();
+          if (await elDialogInput.count() > 0) {
+            await elDialogInput.fill(quoteID);
+            console.log(`  ✓ 已填入 Quote ID (el-dialog): ${quoteID}`);
+          } else {
+            console.warn('  ⚠ 未找到 Quote ID 输入框');
+          }
+        }
+      }
+
+      await sleep(500);
+
+      // 点击 Confirm 按钮
+      const confirmBtn = page.locator('button').filter({ hasText: 'Confirm' }).first();
+      if (await confirmBtn.count() > 0) {
+        await confirmBtn.click();
+        console.log('  ✅ 已点击 Confirm 按钮');
+      } else {
+        // 备用：查找 layui 确认按钮
+        const layuiConfirm = page.locator('.layui-layer-btn a').filter({ hasText: 'Confirm' }).first();
+        if (await layuiConfirm.count() > 0) {
+          await layuiConfirm.click();
+          console.log('  ✅ 已点击 Confirm 按钮 (layui)');
+        } else {
+          console.warn('  ⚠ 未找到 Confirm 按钮');
+        }
+      }
+    } else {
+      console.warn('  ⚠ 未能获取 Quote ID，跳过弹窗处理');
+    }
+
   } catch (e) {
     console.warn(`  ⚠ 点击 Submit 失败: ${e}`);
     await page.screenshot({ path: 'screenshots/submit-error.png' }).catch(() => {});
@@ -953,6 +1025,72 @@ async function fillSubmitPage(page: Page, order: OrderRow) {
 // ==================== 工具函数 ====================
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// 创建 Channel Quote 并返回 quoteID
+async function createChannelQuote(buyerName: string): Promise<string | null> {
+  const API_URL = 'https://precisepipe-api.activatortube.com/front-api/pc/airtable/testCreateChannelQuote';
+
+  const timestamp = Date.now();
+  const dateStr = new Date().toISOString().slice(0, 19).replace(/[:.T]/g, '-').toLowerCase();
+  const uniqueId = `${dateStr}_${timestamp}`;
+
+  const params = {
+    channelName: `quote-${uniqueId}`,
+    emailTitle: `test create channel ${uniqueId}`,
+    compliance: 'Lee',
+    sales: 'Lee',
+    internCompliance: '',
+    buyer: buyerName || 'Justin Crawford'
+  };
+
+  return new Promise((resolve) => {
+    const queryString = querystring.stringify(params);
+    const url = `${API_URL}?${queryString}`;
+
+    const options = {
+      method: 'POST',
+    };
+
+    const req = https.request(url, options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          // 从响应中提取 quoteID
+          const quoteID = json?.data?.quoteID || json?.quoteID || json?.id || null;
+          if (quoteID) {
+            console.log(`  ✓ 创建 Channel Quote 成功，quoteID: ${quoteID}`);
+            resolve(String(quoteID));
+          } else {
+            console.warn(`  ⚠ API 返回数据中没有找到 quoteID: ${data}`);
+            resolve(null);
+          }
+        } catch (e) {
+          console.warn(`  ⚠ 解析 API 响应失败: ${e}`);
+          resolve(null);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.warn(`  ⚠ 调用 API 失败: ${error.message}`);
+      resolve(null);
+    });
+
+    req.setTimeout(30000, () => {
+      req.destroy();
+      console.warn('  ⚠ API 请求超时');
+      resolve(null);
+    });
+
+    req.end();
+  });
 }
 
 function askInput(prompt: string): Promise<string> {
