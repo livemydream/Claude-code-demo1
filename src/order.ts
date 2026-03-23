@@ -11,7 +11,7 @@ const CONFIG = {
   captchaCode: '240501',   // 第一个验证码（图形验证码）
   slackCode: 'PP8STD',     // 第二个验证码（Slack 验证码）
   salesName: 'Alex Chow',  // Sales 姓名（可修改）
-  excelFile: './demo.xlsx',
+  excelFile: './demo2.xlsx',
   headless: false,         // false = 显示浏览器窗口
   defaultMinLength: '18',  // Min Length 默认值（英尺）
   defaultMaxLength: '22',  // Max Length 默认值（英尺）
@@ -32,6 +32,11 @@ interface OrderRow {
   schedule?: string;  // 解析自 Size，如 "STD"
   qty?: number;
   unit?: string;
+  // 行项目新增字段
+  mill?: string;       // Mill 厂家
+  length?: string;     // Length 长度类型 (SRL/DRL)
+  end?: string;        // End 端部类型
+  make?: string;       // Make 制造方式
   // 第三页新增字段
   sellFrom?: string;    // Sell From
   company?: string;     // Company 名称
@@ -40,37 +45,63 @@ interface OrderRow {
 }
 
 // ==================== 读取 Excel ====================
+// Sheet1 结构: 头部信息 (LoginSales, Incoterm, Currency, Destination, Company, Is End User, Sell From, Yard Address)
+// Sheet2 结构: 行项目 (Mill, Spec, Size, Qty, Unit, Length, End, Make)
 function readExcel(filePath: string): OrderRow[] {
   const absPath = path.resolve(filePath);
   const wb = XLSX.readFile(absPath);
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rawRows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-  let lastIncoterm = '';
-  let lastCurrency = '';
-  let lastDestination = '';
-  let lastSpec = '';
-  let lastLoginSales = '';
-  let lastSellFrom = '';
-  let lastCompany = '';
-  let lastIsEndUser = false;
-  let lastYardAddress = '';
+  // ========== 读取 Sheet1 头部信息 ==========
+  let headerInfo = {
+    loginSales: '',
+    incoterm: '',
+    currency: '',
+    destination: '',
+    company: '',
+    isEndUser: false,
+    sellFrom: '',
+    yardAddress: '',
+  };
 
+  if (wb.SheetNames.includes('Sheet1')) {
+    const ws1 = wb.Sheets['Sheet1'];
+    const rows1: any[] = XLSX.utils.sheet_to_json(ws1, { defval: '' });
+    if (rows1.length > 0) {
+      const firstRow = rows1[0];
+      headerInfo = {
+        loginSales: String(firstRow['LoginSales'] || '').trim(),
+        incoterm: String(firstRow['Incoterm'] || '').trim(),
+        currency: String(firstRow['Currency'] || '').trim(),
+        destination: String(firstRow['Destination'] || '').trim(),
+        company: String(firstRow['Company'] || '').trim(),
+        isEndUser: String(firstRow['Is End User'] || '0').trim() === '1',
+        sellFrom: String(firstRow['Sell From'] || '').trim(),
+        yardAddress: String(firstRow['Yard Address'] || '').trim(),
+      };
+    }
+  }
+
+  // ========== 读取 Sheet2 行项目 ==========
   const orders: OrderRow[] = [];
 
+  // 优先从 Sheet2 读取，如果没有则从 Sheet1 读取
+  const sheetName = wb.SheetNames.includes('Sheet2') ? 'Sheet2' : wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rawRows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+  let lastMill = '';
+  let lastSpec = '';
+  let lastLength = '';
+  let lastEnd = '';
+  let lastMake = '';
+
   for (const row of rawRows) {
-    // 继承上一行的值（Excel 中合并单元格或空行复用）
-    if (row['Incoterm']) lastIncoterm = String(row['Incoterm']).trim();
-    if (row['Currency']) lastCurrency = String(row['Currency']).trim();
-    if (row['Destination']) lastDestination = String(row['Destination']).trim();
+    // 继承上一行的值
+    if (row['Mill']) lastMill = String(row['Mill']).trim();
     if (row['Spec']) lastSpec = String(row['Spec']).trim();
-    if (row['LoginSales']) lastLoginSales = String(row['LoginSales']).trim();
-    if (row['Sell From']) lastSellFrom = String(row['Sell From']).trim();
-    if (row['Company']) lastCompany = String(row['Company']).trim();
-    if (row['Is End User'] !== undefined && row['Is End User'] !== '') {
-      lastIsEndUser = String(row['Is End User']).trim() === '1';
-    }
-    if (row['Yard Address']) lastYardAddress = String(row['Yard Address']).trim();
+    if (row['Length']) lastLength = String(row['Length']).trim();
+    if (row['End']) lastEnd = String(row['End']).trim();
+    if (row['Make']) lastMake = String(row['Make']).trim();
 
     const sizeRaw = String(row['Size'] || '').trim();
     const qty = row['Qty'];
@@ -87,19 +118,25 @@ function readExcel(filePath: string): OrderRow[] {
     }
 
     orders.push({
-      incoterm: lastIncoterm,
-      currency: lastCurrency,
-      destination: lastDestination,
+      // 头部信息（从 Sheet1）
+      loginSales: headerInfo.loginSales,
+      incoterm: headerInfo.incoterm,
+      currency: headerInfo.currency,
+      destination: headerInfo.destination,
+      company: headerInfo.company,
+      isEndUser: headerInfo.isEndUser,
+      sellFrom: headerInfo.sellFrom,
+      yardAddress: headerInfo.yardAddress,
+      // 行项目信息（从 Sheet2）
+      mill: lastMill,
       spec: lastSpec,
-      loginSales: lastLoginSales,
+      length: lastLength,
+      end: lastEnd,
+      make: lastMake,
       nps: parsed.nps,
       schedule: parsed.schedule,
       qty: Number(qty),
       unit,
-      sellFrom: lastSellFrom,
-      company: lastCompany,
-      isEndUser: lastIsEndUser,
-      yardAddress: lastYardAddress,
     });
   }
 
@@ -493,49 +530,86 @@ async function fillItemModal(page: Page, order: OrderRow): Promise<boolean> {
     console.warn(`  ⚠ 设置 Max Length 失败: ${e}`);
   }
 
-  // === 选择 Spec（必填，从 Excel 读取）===
+// === 选择 Spec（必填，从 Excel 读取，支持多个用 | 分隔）===
   if (spec) {
+    // 解析多个 spec（用 | 分隔）
+    const specs = spec.split('|').map(s => s.trim()).filter(s => s);
+    console.log(`  → 需要选择 ${specs.length} 个 Spec: ${specs.join(', ')}`);
+
     try {
       // 通过 "Spec:" 文字找到对应下拉容器（.el-select__wrapper）
       const specWrapper = frame.locator('p').filter({ hasText: /^Spec:$/ })
         .locator('..').locator('.el-select__wrapper');
       await specWrapper.waitFor({ timeout: 5000 });
 
-      // 每次都先尝试点击关闭按钮清空旧值（无论是否存在）
+      // 循环清空所有旧值
       const closeBtn = specWrapper.locator('.el-tag__close');
-      try {
-        await closeBtn.click({ timeout: 2000 });
+      let cleared = 0;
+      while (await closeBtn.count() > 0) {
+        await closeBtn.first().click();
         await sleep(300);
-        console.log(`  ✓ 已清空旧 Spec`);
-      } catch {
-        // 没有旧值，忽略
+        cleared++;
+      }
+      if (cleared > 0) {
+        console.log(`  ✓ 已清空 ${cleared} 个旧 Spec`);
       }
 
-      // 点击打开下拉框
-      await specWrapper.click();
+      // 依次选择每个 spec
       const searchBox = frame.locator('input[placeholder="Please Search"]');
-      await searchBox.waitFor({ timeout: 5000 });
+      let dropdownOpen = false;
 
-      await searchBox.fill(spec.substring(0, 10));
-      await sleep(300);
+      for (let i = 0; i < specs.length; i++) {
+        const currentSpec = specs[i];
+        console.log(`  → 选择 Spec [${i + 1}/${specs.length}]: ${currentSpec}`);
 
-      const specOption = frame.getByRole('option', { name: spec, exact: true });
-      try {
-        await specOption.waitFor({ timeout: 5000 });
-        await specOption.click();
-        console.log(`  ✓ 已选择 Spec: ${spec}`);
-      } catch {
-        const partialOpt = frame.getByRole('option').filter({ hasText: spec }).first();
-        try {
-          await partialOpt.waitFor({ timeout: 3000 });
-          await partialOpt.click();
-          console.log(`  ✓ 已选择 Spec (partial): ${spec}`);
-        } catch {
-          console.warn(`  ⚠ 未找到 Spec 选项: "${spec}"，按 Escape 关闭`);
-          await frame.locator('body').press('Escape');
+        // 仅在下拉框未打开时才点击打开
+        if (!dropdownOpen) {
+          await specWrapper.click();
+          await searchBox.waitFor({ timeout: 5000 });
+          dropdownOpen = true;
         }
+
+        // 点击搜索框，清空并重新输入
+        await searchBox.click({ force: true });
+        await searchBox.press('Control+a');
+        await searchBox.fill(currentSpec.substring(0, 20));
+        await sleep(800); // 等待搜索完成
+
+        // 尝试精确匹配
+        const specOption = frame.getByRole('option', { name: currentSpec, exact: true });
+        let found = false;
+        try {
+          await specOption.waitFor({ timeout: 3000 });
+          await specOption.click();
+          console.log(`    ✓ 已选择 Spec: ${currentSpec}`);
+          found = true;
+          // Element Plus 多选模式下，选择后下拉框保持打开
+        } catch {
+          // 尝试部分匹配
+          const partialOpt = frame.getByRole('option').filter({ hasText: currentSpec }).first();
+          try {
+            await partialOpt.waitFor({ timeout: 3000 });
+            await partialOpt.click();
+            console.log(`    ✓ 已选择 Spec (partial): ${currentSpec}`);
+            found = true;
+          } catch {
+            console.warn(`    ⚠ 未找到 Spec 选项: "${currentSpec}"`);
+            // 未找到时关闭下拉框，标记状态
+            await frame.locator('body').press('Escape');
+            await sleep(300);
+            dropdownOpen = false;
+          }
+        }
+
+        await sleep(300);
       }
-      await sleep(300);
+
+      // 最终关闭下拉框
+      if (dropdownOpen) {
+        await frame.locator('body').press('Escape');
+        await sleep(300);
+      }
+      console.log(`  ✓ 完成所有 Spec 选择`);
     } catch (e) {
       console.warn(`  ⚠ 设置 Spec 失败: ${e}`);
     }
