@@ -32,7 +32,26 @@
       "Bash(node debug-aml-selector.js)",
       "Bash(node debug-aml-simple.js)",
       "mcp__zai-mcp-server__analyze_image",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__new_page",
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__list_pages",
+      "Bash(npx ts-node:*)",
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__navigate_page",
+      "Bash(npx ts-node -e \":*)",
+      "Bash(node -e \":*)",
+      "Bash(ls -la \"h:/github/2026/ai/Claude-code-demo1/\"*.xlsx)",
+      "mcp__web-reader__webReader",
+      "Bash(curl -L -o \"h:/github/2026/ai/Claude-code-demo1/RFQ_362026_Com.xlsx\" \"https://tools.precisepipe.com/assistant/attachments/20260306/1c7819ff-08e9-4149-91c6-37d9250fbc24.xlsx\")",
+      "WebSearch",
+      "mcp__zread__get_repo_structure",
+      "mcp__zread__read_file",
+      "mcp__zread__search_doc",
+      "Bash(curl -s -o \"h:/github/2026/ai/Claude-code-demo1/RFQ_362026_Com.xlsx\" \"https://tools.precisepipe.com/assistant/attachments/20260306/1c7819ff-08e9-4149-91c6-37d9250fbc24.xlsx\")",
+      "Skill(glm-plan-usage:usage-query)",
+      "Skill(glm-plan-usage:usage-query:*)",
+      "Bash(curl -s -o /tmp/rfq362026_bom.xlsx \"https://tools.precisepipe.com/assistant/attachments/20260306/1c7819ff-08e9-4149-91c6-37d9250fbc24.xlsx\")",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o \"h:/github/2026/ai/Claude-code-demo1/temp_bom.xlsx\" \"https://tools.precisepipe.com/assistant/attachments/20260306/1c7819ff-08e9-4149-91c6-37d9250fbc24.xlsx\")"
     ]
   }
 }
