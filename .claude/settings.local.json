@@ -51,7 +51,13 @@
       "Skill(glm-plan-usage:usage-query:*)",
       "Bash(curl -s -o /tmp/rfq362026_bom.xlsx \"https://tools.precisepipe.com/assistant/attachments/20260306/1c7819ff-08e9-4149-91c6-37d9250fbc24.xlsx\")",
       "Read(//tmp/**)",
-      "Bash(curl -s -o \"h:/github/2026/ai/Claude-code-demo1/temp_bom.xlsx\" \"https://tools.precisepipe.com/assistant/attachments/20260306/1c7819ff-08e9-4149-91c6-37d9250fbc24.xlsx\")"
+      "Bash(curl -s -o \"h:/github/2026/ai/Claude-code-demo1/temp_bom.xlsx\" \"https://tools.precisepipe.com/assistant/attachments/20260306/1c7819ff-08e9-4149-91c6-37d9250fbc24.xlsx\")",
+      "Bash(curl -s -o \"q5291_bom.xlsx\" \"https://tools.precisepipe.com/assistant/attachments/20260306/1c7819ff-08e9-4149-91c6-37d9250fbc24.xlsx\")",
+      "Bash(rm -rf \"d:/github/ai/Claude-code-demo1/.claude/skills/read_linepipe_email/scripts/emailHtml/q5291\")",
+      "Bash(rm -f \"d:/github/ai/Claude-code-demo1/q5291_bom.xlsx\")",
+      "Bash(curl -s -o q5291_bom.xlsx \"https://tools.precisepipe.com/assistant/attachments/20260306/1c7819ff-08e9-4149-91c6-37d9250fbc24.xlsx\")",
+      "Bash(rm -rf .claude/skills/read_linepipe_email/scripts/emailHtml/q5291)",
+      "Bash(rm -f q5291_bom.xlsx)"
     ]
   }
 }

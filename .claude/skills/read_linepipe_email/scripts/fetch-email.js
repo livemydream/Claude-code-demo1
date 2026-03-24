@@ -6,6 +6,7 @@
  */
 
 const https = require('https');
+const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 
@@ -31,20 +32,34 @@ const options = {
   headers: {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Encoding': 'gzip, deflate, br',
     'Accept-Language': 'zh-CN,zh;q=0.9',
     'Connection': 'keep-alive',
     'Cookie': `LinePipe_loginVerify=${TOKEN}`
-  }
+  },
+  timeout: 120000
 };
 
 const req = https.request(options, (res) => {
-  let data = '';
+  const chunks = [];
 
-  res.on('data', (chunk) => {
-    data += chunk;
+  // 根据 Content-Encoding 解压
+  let stream = res;
+  const encoding = res.headers['content-encoding'];
+  if (encoding === 'gzip') {
+    stream = res.pipe(zlib.createGunzip());
+  } else if (encoding === 'deflate') {
+    stream = res.pipe(zlib.createInflate());
+  } else if (encoding === 'br') {
+    stream = res.pipe(zlib.createBrotliDecompress());
+  }
+
+  stream.on('data', (chunk) => {
+    chunks.push(chunk);
   });
 
-  res.on('end', () => {
+  stream.on('end', () => {
+    const data = Buffer.concat(chunks).toString('utf-8');
     if (res.statusCode === 200) {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
       const saveDir = path.join(__dirname, 'emailHtml', emailId);
@@ -65,6 +80,15 @@ const req = https.request(options, (res) => {
       console.log('响应:', data.substring(0, 200));
     }
   });
+
+  stream.on('error', (e) => {
+    console.log(`❌ 解压/读取错误: ${e.message}`);
+  });
+});
+
+req.on('timeout', () => {
+  console.log('❌ 请求超时 (60s)');
+  req.destroy();
 });
 
 req.on('error', (e) => {

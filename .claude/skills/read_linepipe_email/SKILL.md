@@ -89,14 +89,42 @@ node .claude/skills/read_linepipe_email/scripts/fetch-email.js <email_id>
 
 ### 6. 输出格式
 
-以 Markdown 表格格式输出：
+将匹配结果写入 `demo2.xlsx` 的 **Sheet2**（保留 Sheet1 不变）。
 
-| Mill | Spec | Size | Qty | Unit | Length | End | Make |
-|------|------|------|-----|------|--------|-----|------|
-| {Mill} | {Spec} | {Size} | {Qty} | {unit} | {Length} | {End} | {Make} |
-| {Mill} | {Spec} | {Size} | {Qty} | {unit} | {Length} | {End} | {Make} |
+使用 `xlsx` 库写入，示例代码：
+```javascript
+const XLSX = require('xlsx');
+const wb = XLSX.readFile('demo2.xlsx');
 
-**注意**：Spec 如果有多个用 `|` 隔开
+// 构建 Sheet2 数据（含表头）
+const headers = ['Mill', 'Spec', 'Size', 'Qty', 'Unit', 'Length', 'End', 'Make'];
+const rows = [headers, ...items.map(item => [item.mill, item.spec, item.size, item.qty, item.unit, item.length, item.end, item.make])];
+const ws = XLSX.utils.aoa_to_sheet(rows);
+
+// 替换 Sheet2
+wb.Sheets['Sheet2'] = ws;
+if (!wb.SheetNames.includes('Sheet2')) wb.SheetNames.push('Sheet2');
+
+XLSX.writeFile(wb, 'demo2.xlsx');
+```
+
+**列定义**：
+
+| 列 | 内容 |
+|----|------|
+| A | Mill |
+| B | Spec（多个用 `\|` 隔开） |
+| C | Size |
+| D | Qty |
+| E | Unit |
+| F | Length |
+| G | End |
+| H | Make |
+
+**注意**：
+- Spec 如果有多个用 `|` 隔开
+- 每次写入前清空 Sheet2 旧数据，重新写入
+- 写入完成后在终端输出确认信息和行数
 
 ### 7. 匹配规则
 - 精确匹配优先
@@ -105,14 +133,17 @@ node .claude/skills/read_linepipe_email/scripts/fetch-email.js <email_id>
 
 ## 示例
 
-**输入**：邮件文件 `email-q5291-2026-03-23T02-34-31.html`
+**输入**：邮件 ID `q5291`
 
-**输出**：
-```
-item 1：Hengyang CSAZ245.1:2022 359 Cat II|ASTM/ASME106-19 B NPS 1/2 XXS 1000 ft SRL Plain End Square Cut Seamless
-item 2：Hengyang CSAZ245.1:2022 359 Cat II|ASTM/ASME106-19 B NPS 3/4 XS 4000 ft SRL Plain End Square Cut Seamless
-...
-```
+**输出**：写入 `demo2.xlsx` Sheet2，内容如下：
+
+| Mill | Spec | Size | Qty | Unit | Length | End | Make |
+|------|------|------|-----|------|--------|-----|------|
+| Hengyang | CSAZ245.1:2022 359 Cat II\|ASTM/ASME106-19 B | NPS 1/2 XXS | 1000 | ft | SRL | Plain End Square Cut | Seamless |
+| Hengyang | CSAZ245.1:2022 359 Cat II\|ASTM/ASME106-19 B | NPS 3/4 XS | 4000 | ft | SRL | Plain End Square Cut | Seamless |
+| ... | | | | | | | |
+
+终端输出：`已写入 demo2.xlsx Sheet2，共 16 行数据`
 
 ## 依赖文件
 
