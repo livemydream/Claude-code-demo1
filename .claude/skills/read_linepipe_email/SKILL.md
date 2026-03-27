@@ -5,162 +5,82 @@ description: "分析客户邮件，提取 BOM 订单规格并与 linepipe 参考
 
 # 读取 Linepipe 邮件
 
-分析客户邮件，提取 BOM 订单规格并与 linepipe 参考数据进行匹配。
+## 步骤 1 — 获取邮件
 
-## 执行步骤
-
-### 1. 获取邮件内容
-用户只需提供邮件 ID（如 `q5291`），执行以下命令获取邮件 HTML：
+用户只提供邮件 ID（如 `q5291`），一条命令完成获取+提取：
 
 ```bash
 node .claude/skills/read_linepipe_email/scripts/fetch-email.js <email_id>
 ```
 
-脚本会自动：
-- 从 `tools.precisepipe.com` 获取邮件内容
-- 将 HTML 保存到 `.claude/skills/read_linepipe_email/scripts/emailHtml/<email_id>/` 目录
+输出 `.md` 文件路径，直接读取该文件。
 
-获取成功后，读取生成的 HTML 文件进行分析
+## 步骤 2 — 下载附件
 
-### 2. 提取附件信息
-- 在邮件中搜索附件链接（`/assistant/attachments/` 路径）
-- 使用 `https://tools.precisepipe.com` 拼接附件 URL
-- 用 curl 下载 Excel/PDF 附件（每次都要重新下载）
-- 读取 Excel BOM 内容
+- 搜索 `.md` 中的 `/assistant/attachments/` 链接
+- 只下载 下单信息相关的文件（`.xlsx`、`.xls`、`.pdf`）
+- URL 前缀：`https://tools.precisepipe.com`
+- 每次重新下载，不使用缓存
 
-### 3. 分析客户需求
-从邮件内容中提取：
-- 客户信息
-- Mill 要求（如：小于 2" 用 Hengyang，2" 及以上用 MSL）
-- Spec 规格要求
-- 其他特殊要求
+## 步骤 3 — 提取并匹配
 
-### 4. 匹配规格数据
-参考 `references/linepipe_reference.md` 进行匹配：
+从邮件+附件中提取每行 BOM，按 `quick-match.md` 规则匹配。
 
-| 字段 | 匹配规则 |
-|------|----------|
-| **Mill** | 按客户要求或默认规则（< 2" → Hengyang, ≥ 2" → MSL） |
-| **Spec** | 从 BOM 描述提取规格代码，匹配最相近的结果 |
-| **Size** | 格式：`NPS {尺寸} {壁厚}`，如 `NPS 1/2 XXS` |
-| **Qty** | 从 BOM 提取数量 |
-| **Unit** | 从 BOM 提取单位（通常为 ft） |
-| **Length** | SRL/DRL/TRL/R1/R2/R3 等 |
-| **End** | Plain End Square Cut / Beveled / Threaded 等 |
-| **Make** | Seamless / Welded / ERW 等 |
+### 核心原则
 
-### 5. 规格匹配对照表
+1. **每个字段只能填对应参考数据中的精确匹配值**，匹配不到留空
+2. **Non-AML 是 AML 字段，不是 Spec** — 网站表头的 AML 下拉框会自动设为 Non-AML，不要把 Non-AML 写入 Excel 的 Spec 列
+3. **禁止猜测或模糊匹配** — 没有命中参考数据的值一律留空字符串 `""`
 
-#### Spec 映射
-| BOM 描述关键词 | 匹配 Spec |
-|---------------|-----------|
-| A/SA333-6 GR 359 CAT 2 / CSA GR 359 CAT 2 | CSAZ245.1:2022 359 Cat II |
-| A/SA333-6 GR 359 CAT 3 / CSA GR 359 CAT 3 | CSAZ245.1:2022 359 Cat III |
+### AML 处理（表头级，非每行 BOM）
 
+AML 是整个 Quote 的表头字段，由 `order.ts` 的 `selectNonAML()` 自动处理。常见关键词：
+- `No AML restrictions` / `No restrictions on AML` / `Non-AML` / `No AML` → 自动选 Non-AML
+- `Caterpillar` / `Shell` / `CNRL` 等客户名 → 对应 AML 客户规格
 
-#### Size 映射
-| BOM 描述 | Size 格式 |
-|----------|-----------|
-| 1/2" XXS | NPS 1/2 XXS |
-| 3/4" XS | NPS 3/4 XS |
+**不要将 AML 相关内容写入 Excel 的 Spec 列。**
 
+### 字段匹配规则
 
-#### End 映射
-| BOM 描述 | End |
-|----------|-----|
-| PLAIN END | Plain End Square Cut |
-| BEVELED END / BE | Beveled |
-| THREADED | Threaded |
-| T&C | Threaded and Coupled |
+| 字段 | 规则 | 参考文件 |
+|------|------|------|
+| **Mill** | < 2" → Hengyang, ≥ 2" → MSL（客户指定则按邮件原文） | references/mill.md (70+项) |
+| **Spec** | 只能是参考数据中的精确值，多选用 `\|` 连接 | references/spec.md (203项) |
+| **Size** | `NPS {nps} {schedule}`，必须精确匹配 | references/size.md (305项) |
+| **Qty/Unit** | 直接从邮件提取 | 邮件原文 |
+| **Length** | 必须精确匹配 | references/length.md (9项) |
+| **End** | 必须精确匹配 | references/end.md (45项) |
+| **Make** | 必须精确匹配 | references/make.md (11项) |
 
-#### Length 映射
-| BOM 描述 | Length |
-|----------|--------|
-| SRL | SRL |
-| DRL | DRL |
-| TRL | TRL |
+## 步骤 4 — 写入 Excel
 
-#### Make 映射
-| BOM 描述 | Make |
-|----------|------|
-| SMLS / SEAMLESS | Seamless |
-| ERW | ERW |
-| WELDED | Welded |
+写入 `demo2.xlsx` 的 **Sheet2**（保留 Sheet1）：
 
-### 6. 输出格式
-
-将匹配结果写入 `demo2.xlsx` 的 **Sheet2**（保留 Sheet1 不变）。
-
-使用 `xlsx` 库写入，示例代码：
 ```javascript
 const XLSX = require('xlsx');
 const wb = XLSX.readFile('demo2.xlsx');
-
-// 构建 Sheet2 数据（含表头）
 const headers = ['Mill', 'Spec', 'Size', 'Qty', 'Unit', 'Length', 'End', 'Make'];
-const rows = [headers, ...items.map(item => [item.mill, item.spec, item.size, item.qty, item.unit, item.length, item.end, item.make])];
+const rows = [headers, ...items.map(i => [i.mill, i.spec, i.size, i.qty, i.unit, i.length, i.end, i.make])];
 const ws = XLSX.utils.aoa_to_sheet(rows);
-
-// 替换 Sheet2
 wb.Sheets['Sheet2'] = ws;
 if (!wb.SheetNames.includes('Sheet2')) wb.SheetNames.push('Sheet2');
-
 XLSX.writeFile(wb, 'demo2.xlsx');
 ```
 
-**列定义**：
-
-| 列 | 内容 |
-|----|------|
-| A | Mill |
-| B | Spec（多个用 `\|` 隔开） |
-| C | Size |
-| D | Qty |
-| E | Unit |
-| F | Length |
-| G | End |
-| H | Make |
-
 **注意**：
-- Spec 如果有多个用 `|` 隔开
-- 每次写入前清空 Sheet2 旧数据，重新写入
-- 写入完成后在终端输出确认信息和行数
+- Spec 多选用 `|` 隔开，但**只能包含 Spec 参考列表中的精确值**，不含 AML 内容
+- 匹配不到时写空字符串 `""`，不要用近似值填充
+- 每次写入清空旧 Sheet2 数据
 
-### 7. 匹配规则
-- 精确匹配优先
-- 匹配不到时匹配最相近的结果
-- 都匹配不到输出空字符串
-
-## 示例
-
-**输入**：邮件 ID `q5291`
-
-**输出**：写入 `demo2.xlsx` Sheet2，内容如下：
-
-| Mill | Spec | Size | Qty | Unit | Length | End | Make |
-|------|------|------|-----|------|--------|-----|------|
-| Hengyang | CSAZ245.1:2022 359 Cat II\|ASTM/ASME106-19 B | NPS 1/2 XXS | 1000 | ft | SRL | Plain End Square Cut | Seamless |
-| Hengyang | CSAZ245.1:2022 359 Cat II\|ASTM/ASME106-19 B | NPS 3/4 XS | 4000 | ft | SRL | Plain End Square Cut | Seamless |
-| ... | | | | | | | |
-
-终端输出：`已写入 demo2.xlsx Sheet2，共 16 行数据`
-
-## 依赖文件
-
-- `docs/linepipe.md` - 规格参考数据
-- `docs/linepipe_reference.md` - 规格参考数据（完整版）
-
-### 8. 清理临时文件
-分析完成后，删除第一步下载的邮件 HTML 文件：
+## 步骤 5 — 清理 & 执行
 
 ```bash
 rm -rf .claude/skills/read_linepipe_email/scripts/emailHtml/<email_id>
+npm run order
 ```
 
-## 注意事项
+## 异常处理
 
-1. 每次分析都要重新下载附件，不要使用缓存
-2. 邮件可能包含多个回复，注意找到原始 BOM 附件
-3. Mill 要求通常在邮件正文中说明
-4. Spec 可能有多个标准组合，用 `|` 分隔
-5. 分析完成后务必清理临时文件
+- 任何步骤失败不阻塞，跳过并继续，最后汇总报告失败项
+- 匹配不到时输出空字符串
+- 邮件有多个回复时，找到原始 BOM 附件

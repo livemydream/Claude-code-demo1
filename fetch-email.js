@@ -2,7 +2,6 @@
  * 邮件HTML获取脚本
  * 用法: node fetch-email.js <email_id>
  * 示例: node fetch-email.js q5291
- *       node fetch-email.js q5292
  */
 
 const https = require('https');

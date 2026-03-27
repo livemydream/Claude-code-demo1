@@ -57,7 +57,10 @@
       "Bash(rm -f \"d:/github/ai/Claude-code-demo1/q5291_bom.xlsx\")",
       "Bash(curl -s -o q5291_bom.xlsx \"https://tools.precisepipe.com/assistant/attachments/20260306/1c7819ff-08e9-4149-91c6-37d9250fbc24.xlsx\")",
       "Bash(rm -rf .claude/skills/read_linepipe_email/scripts/emailHtml/q5291)",
-      "Bash(rm -f q5291_bom.xlsx)"
+      "Bash(rm -f q5291_bom.xlsx)",
+      "Bash(curl -sL -o /tmp/q5291-rev2.pdf \"https://tools.precisepipe.com/assistant/attachments/20260326/1d50ea08-c6e1-497b-9daf-a3fa91400d3d.pdf\")",
+      "mcp__zai-mcp-server__extract_text_from_screenshot",
+      "Bash(curl -sL -o q5309_rev1.pdf \"https://tools.precisepipe.com/assistant/attachments/20260313/c19f8e8f-e8cb-4a2d-ba59-84008288ccc0.pdf\")"
     ]
   }
 }

@@ -459,11 +459,32 @@ async function clickSizeCell(page: Page, nps: string, schedule: string): Promise
   return clicked;
 }
 
+// ==================== 处理已填写格子的 "Add Another..." 前置弹窗 ====================
+async function handleExistingItemPopup(page: Page): Promise<boolean> {
+  try {
+    // 已填写过的格子会弹出 layui layer，内含 .line_pipe_checked_box_center_add 链接
+    const addBtn = page.locator('.line_pipe_checked_box_center_add');
+    await addBtn.waitFor({ timeout: 3000 });
+    if (await addBtn.isVisible()) {
+      await addBtn.click({ timeout: 3000 });
+      console.log('  ✓ 已点击 Add Another... 按钮');
+      await sleep(800);
+      return true;
+    }
+  } catch {
+    // 没有前置弹窗，直接进入 iframe
+  }
+  return false;
+}
+
 // ==================== 等待 iframe 弹窗并填写数量 ====================
 async function fillItemModal(page: Page, order: OrderRow): Promise<boolean> {
   const qty = order.qty!;
   const unit = order.unit!;
   const spec = order.spec;
+
+  // 先检查是否有已填写格子的 "Add Another..." 前置弹窗
+  await handleExistingItemPopup(page);
 
   // 等待 layui iframe 出现，取 ID 最大（最新打开）的那个
   try {
