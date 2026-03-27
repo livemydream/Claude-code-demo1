@@ -76,6 +76,9 @@ XLSX.writeFile(wb, 'demo2.xlsx');
 
 ```bash
 rm -rf .claude/skills/read_linepipe_email/scripts/emailHtml/<email_id>
+```
+## 步骤 6 自动下单
+```bash
 npm run order
 ```
 
