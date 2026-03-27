@@ -35,6 +35,9 @@ interface OrderRow {
   // 行项目新增字段
   mill?: string;       // Mill 厂家
   length?: string;     // Length 长度类型 (SRL/DRL)
+  minLength?: number;  // Min Length（英尺），有值时覆盖默认值
+  maxLength?: number;  // Max Length（英尺），有值时覆盖默认值
+  fixedLength?: number; // Fixed Length（英尺），有值时覆盖默认值
   end?: string;        // End 端部类型
   make?: string;       // Make 制造方式
   // 第三页新增字段
@@ -92,6 +95,9 @@ function readExcel(filePath: string): OrderRow[] {
   let lastMill = '';
   let lastSpec = '';
   let lastLength = '';
+  let lastMinLength = NaN;
+  let lastMaxLength = NaN;
+  let lastFixedLength = NaN;
   let lastEnd = '';
   let lastMake = '';
 
@@ -100,6 +106,9 @@ function readExcel(filePath: string): OrderRow[] {
     if (row['Mill']) lastMill = String(row['Mill']).trim();
     if (row['Spec']) lastSpec = String(row['Spec']).trim();
     if (row['Length']) lastLength = String(row['Length']).trim();
+    if (row['Min Length'] !== '' && row['Min Length'] != null) lastMinLength = Number(row['Min Length']);
+    if (row['Max Length'] !== '' && row['Max Length'] != null) lastMaxLength = Number(row['Max Length']);
+    if (row['Fixed Length'] !== '' && row['Fixed Length'] != null) lastFixedLength = Number(row['Fixed Length']);
     if (row['End']) lastEnd = String(row['End']).trim();
     if (row['Make']) lastMake = String(row['Make']).trim();
 
@@ -131,6 +140,9 @@ function readExcel(filePath: string): OrderRow[] {
       mill: lastMill,
       spec: lastSpec,
       length: lastLength,
+      minLength: isNaN(lastMinLength) ? undefined : lastMinLength,
+      maxLength: isNaN(lastMaxLength) ? undefined : lastMaxLength,
+      fixedLength: isNaN(lastFixedLength) ? undefined : lastFixedLength,
       end: lastEnd,
       make: lastMake,
       nps: parsed.nps,
@@ -494,6 +506,7 @@ async function fillItemModal(page: Page, order: OrderRow): Promise<boolean> {
     return false;
   }
 
+  
   // 取所有匹配 iframe 中编号最大的（最新弹出的弹窗）
   const iframeId = await page.evaluate(() => {
     const iframes = Array.from(document.querySelectorAll('iframe[id^="layui-layer-iframe"]'));
@@ -523,32 +536,75 @@ async function fillItemModal(page: Page, order: OrderRow): Promise<boolean> {
     return false;
   }
 
-  // === 填写 Min Length（若已有默认值则跳过）===
-  try {
-    const minInput = frame.locator('.el-input__inner').nth(0); // 第1个：Min Length
-    const minVal = await minInput.inputValue().catch(() => '');
-    if (!minVal) {
-      await minInput.fill(CONFIG.defaultMinLength);
-      console.log(`  ✓ 已填写 Min Length: ${CONFIG.defaultMinLength}`);
-    } else {
-      console.log(`  ✓ Min Length 已有默认值: ${minVal}`);
+  // === 选择 Length 下拉（Excel 有值则选择，否则不修改）===
+  if (order.length) {
+    try {
+      // Length 是 itemView.html 中第一个 .el-select（uLength1）
+      const lengthSelect = frame.locator('.item_ul.length .el-select__wrapper').first();
+      await lengthSelect.waitFor({ timeout: 5000 });
+      await lengthSelect.click();
+      await sleep(500);
+      const dropdown = frame.locator('.el-select-dropdown:visible, .el-popper[aria-hidden="false"]').last();
+      await dropdown.waitFor({ state: 'visible', timeout: 5000 });
+      // 匹配选项文本（Excel 的 "Fixed" 对应 "Fixed Length"，其余如 "DRL"/"SRL" 直接匹配）
+      const targetText = order.length === 'Fixed' ? 'Fixed Length' : order.length;
+      const option = dropdown.locator('.el-select-dropdown__item').filter({ hasText: targetText });
+      await option.click();
+      console.log(`  ✓ 已选择 Length: ${order.length}`);
+      await sleep(300);
+    } catch (e) {
+      console.warn(`  ⚠ 选择 Length 失败: ${e}`);
     }
-  } catch (e) {
-    console.warn(`  ⚠ 设置 Min Length 失败: ${e}`);
   }
 
-  // === 填写 Max Length（若已有默认值则跳过）===
-  try {
-    const maxInput = frame.locator('.el-input__inner').nth(1); // 第2个：Max Length
-    const maxVal = await maxInput.inputValue().catch(() => '');
-    if (!maxVal) {
-      await maxInput.fill(CONFIG.defaultMaxLength);
-      console.log(`  ✓ 已填写 Max Length: ${CONFIG.defaultMaxLength}`);
-    } else {
-      console.log(`  ✓ Max Length 已有默认值: ${maxVal}`);
+  if (order.length === 'Fixed') {
+    // === Fixed Length 模式：只有一个 Length 输入框 ===
+    try {
+      const lengthInput = frame.locator('.item_ul.length .el-input__inner').first();
+      await lengthInput.waitFor({ timeout: 5000 });
+      if (order.fixedLength != null) {
+        await lengthInput.fill(String(order.fixedLength));
+        console.log(`  ✓ 已填写 Fixed Length (Excel): ${order.fixedLength}`);
+      } else {
+        const val = await lengthInput.inputValue().catch(() => '');
+        console.log(`  ✓ Fixed Length 已有值: ${val}`);
+      }
+    } catch (e) {
+      console.warn(`  ⚠ 设置 Fixed Length 失败: ${e}`);
     }
-  } catch (e) {
-    console.warn(`  ⚠ 设置 Max Length 失败: ${e}`);
+  } else {
+    // === Range 模式（DRL/SRL 等）：Min Length + Max Length ===
+    try {
+      const minInput = frame.locator('.el-input__inner').nth(0); // 第1个：Min Length
+      const minVal = await minInput.inputValue().catch(() => '');
+      if (order.minLength != null) {
+        await minInput.fill(String(order.minLength));
+        console.log(`  ✓ 已填写 Min Length (Excel): ${order.minLength}`);
+      } else if (!minVal) {
+        await minInput.fill(CONFIG.defaultMinLength);
+        console.log(`  ✓ 已填写 Min Length (默认): ${CONFIG.defaultMinLength}`);
+      } else {
+        console.log(`  ✓ Min Length 已有值: ${minVal}`);
+      }
+    } catch (e) {
+      console.warn(`  ⚠ 设置 Min Length 失败: ${e}`);
+    }
+
+    try {
+      const maxInput = frame.locator('.el-input__inner').nth(1); // 第2个：Max Length
+      const maxVal = await maxInput.inputValue().catch(() => '');
+      if (order.maxLength != null) {
+        await maxInput.fill(String(order.maxLength));
+        console.log(`  ✓ 已填写 Max Length (Excel): ${order.maxLength}`);
+      } else if (!maxVal) {
+        await maxInput.fill(CONFIG.defaultMaxLength);
+        console.log(`  ✓ 已填写 Max Length (默认): ${CONFIG.defaultMaxLength}`);
+      } else {
+        console.log(`  ✓ Max Length 已有值: ${maxVal}`);
+      }
+    } catch (e) {
+      console.warn(`  ⚠ 设置 Max Length 失败: ${e}`);
+    }
   }
 
 // === 选择 Spec（必填，从 Excel 读取，支持多个用 | 分隔）===

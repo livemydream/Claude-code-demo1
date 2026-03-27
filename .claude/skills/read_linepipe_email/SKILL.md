@@ -51,6 +51,9 @@ AML 是整个 Quote 的表头字段，由 `order.ts` 的 `selectNonAML()` 自动
 | **Length** | 必须精确匹配 | references/length.md (9项) |
 | **End** | 必须精确匹配 | references/end.md (45项) |
 | **Make** | 必须精确匹配 | references/make.md (11项) |
+| **Min Length** | 直接从邮件提取 | 邮件原文 没有空着 `""`|
+| **Max Length** | 直接从邮件提取 | 邮件原文 没有空着 `""`|
+| **Fixed Length** | 直接从邮件提取 | 邮件原文 没有空着 `""`|
 
 ## 步骤 4 — 写入 Excel
 
